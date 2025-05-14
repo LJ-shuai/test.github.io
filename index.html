@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D模型查看器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#6B7280',
+                        accent: '#3B82F6',
+                        dark: '#1F2937',
+                        light: '#F9FAFB'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .backdrop-blur-sm {
+                backdrop-filter: blur(4px);
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .transition-custom {
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-inter text-dark min-h-screen flex flex-col">
+    <!-- 导航栏 -->
+    <header class="bg-white shadow-sm sticky top-0 z-50 backdrop-blur-sm bg-white/80">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-cube text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-dark">3D模型查看器</h1>
+            </div>
+            <nav>
+                <ul class="flex space-x-6">
+                    <li><a href="#" class="text-gray-600 hover:text-primary transition-custom">首页</a></li>
+                    <li><a href="#" class="text-gray-600 hover:text-primary transition-custom">示例</a></li>
+                    <li><a href="#" class="text-gray-600 hover:text-primary transition-custom">关于</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <section class="mb-10">
+            <h2 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold mb-2 text-dark">交互式3D模型查看</h2>
+            <p class="text-gray-600 max-w-2xl">查看和交互这个3D模型。支持旋转、缩放和平移操作。</p>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 左侧控制面板 -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-white rounded-xl shadow-md p-6 transform hover:shadow-lg transition-custom">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fa-solid fa-sliders text-primary mr-2"></i>
+                        渲染设置
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">背景颜色</label>
+                            <div class="flex space-x-2">
+                                <button class="w-8 h-8 rounded-full bg-black border-2 border-white shadow-sm hover:scale-110 transition-custom" data-bg-color="#000000"></button>
+                                <button class="w-8 h-8 rounded-full bg-gray-200 border-2 border-white shadow-sm hover:scale-110 transition-custom" data-bg-color="#f3f4f6"></button>
+                                <button class="w-8 h-8 rounded-full bg-blue-50 border-2 border-white shadow-sm hover:scale-110 transition-custom" data-bg-color="#eff6ff"></button>
+                                <button class="w-8 h-8 rounded-full bg-primary border-2 border-white shadow-sm hover:scale-110 transition-custom" data-bg-color="#165DFF"></button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="exposure" class="block text-sm font-medium text-gray-700 mb-1">
+                                曝光度
+                            </label>
+                            <input type="range" id="exposure" min="0" max="2" step="0.1" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>0</span>
+                                <span>1</span>
+                                <span>2</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="envMap" class="block text-sm font-medium text-gray-700 mb-1">
+                                环境贴图
+                            </label>
+                            <select id="envMap" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary/20 transition-custom">
+                                <option value="none">无</option>
+                                <option value="venice">威尼斯</option>
+                                <option value="studio">摄影棚</option>
+                                <option value="city">城市</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-md p-6 transform hover:shadow-lg transition-custom">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fa-solid fa-arrows-rotate text-primary mr-2"></i>
+                        模型操作
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="resetViewBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg transition-custom flex items-center justify-center">
+                                <i class="fa-solid fa-arrows-rotate mr-2"></i>重置视图
+                            </button>
+                            <button id="toggleAnimationBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-lg transition-custom flex items-center justify-center">
+                                <i class="fa-solid fa-play mr-2"></i>动画
+                            </button>
+                        </div>
+                        <div>
+                            <label for="scale" class="block text-sm font-medium text-gray-700 mb-1">
+                                缩放比例
+                            </label>
+                            <input type="range" id="scale" min="0.1" max="3" step="0.1" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                            <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                <span>小</span>
+                                <span>大</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧模型展示区 -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-md overflow-hidden h-[600px] relative group">
+                    <!-- 3D模型渲染区域 -->
+                    <div id="modelContainer" class="w-full h-full bg-gray-100 relative">
+                        <!-- 加载指示器 -->
+                        <div id="loadingIndicator" class="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <div class="text-center">
+                                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+                                <p class="text-white">加载中...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作帮助提示 -->
+                    <div class="absolute bottom-4 right-4 bg-black/60 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p>鼠标拖动: 旋转 | 滚轮: 缩放 | Shift+拖动: 平移</p>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white rounded-xl shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i class="fa-solid fa-info-circle text-primary mr-2"></i>
+                        关于3D模型
+                    </h3>
+                    <div id="modelInfo" class="space-y-4 text-gray-700">
+                        <p>这是一个示例3D模型，展示了3D模型查看器的功能。</p>
+                        <p>你可以通过鼠标交互来查看模型的各个角度：</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>拖动鼠标：旋转模型</li>
+                            <li>滚动鼠标滚轮：缩放模型</li>
+                            <li>Shift+拖动鼠标：平移模型</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-8 mt-12">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold mb-4">3D模型查看器</h3>
+                    <p class="text-gray-400">简单、高效的3D模型在线查看工具，支持多种格式，交互友好。</p>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">支持格式</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li>GLB (.glb)</li>
+                        <li>GLTF (.gltf)</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">联系我们</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center"><i class="fa-solid fa-envelope mr-2"></i> support@example.com</li>
+                        <li class="flex items-center"><i class="fa-solid fa-phone mr-2"></i> +86 123 4567 8910</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-500 text-sm">
+                <p>© 2025 3D模型查看器. 保留所有权利.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 3D渲染相关变量
+        let scene, camera, renderer, controls, model;
+        let mixer, clock;
+        let animationActive = false;
+        // 使用一个示例GLB模型URL
+        const MODEL_URL = 'C:\Users\86178\Documents\WeChat Files\wxid_az6trauuset722\FileStorage\File\2025-05\leifengfeng.glb';
+
+        // DOM元素
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const modelContainer = document.getElementById('modelContainer');
+        const resetViewBtn = document.getElementById('resetViewBtn');
+        const toggleAnimationBtn = document.getElementById('toggleAnimationBtn');
+        const scaleSlider = document.getElementById('scale');
+        const exposureSlider = document.getElementById('exposure');
+        const envMapSelect = document.getElementById('envMap');
+        
+        // 初始化3D场景
+        function init() {
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf3f4f6);
+            
+            // 创建相机
+            camera = new THREE.PerspectiveCamera(75, modelContainer.clientWidth / modelContainer.clientHeight, 0.1, 2000);
+            camera.position.z = 5;
+            
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(modelContainer.clientWidth, modelContainer.clientHeight);
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1;
+            
+            // 添加到DOM
+            modelContainer.innerHTML = '';
+            modelContainer.appendChild(renderer.domElement);
+            
+            // 添加轨道控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // 添加光源
+            addLights();
+            
+            // 初始化时钟（用于动画）
+            clock = new THREE.Clock();
+            
+            // 监听窗口大小变化
+            window.addEventListener('resize', onWindowResize);
+            
+            // 加载模型
+            loadModel(MODEL_URL);
+            
+            // 开始渲染循环
+            animate();
+        }
+        
+        // 添加光源
+        function addLights() {
+            // 环境光
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            
+            // 方向光
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight1.position.set(1, 1, 1);
+            scene.add(directionalLight1);
+            
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight2.position.set(-1, 1, -1);
+            scene.add(directionalLight2);
+            
+            // 半球光
+            const hemisphereLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.4);
+            scene.add(hemisphereLight);
+        }
+        
+        // 窗口大小变化处理
+        function onWindowResize() {
+            camera.aspect = modelContainer.clientWidth / modelContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(modelContainer.clientWidth, modelContainer.clientHeight);
+        }
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 更新控制器
+            controls.update();
+            
+            // 更新动画
+            if (mixer && animationActive) {
+                mixer.update(clock.getDelta());
+            }
+            
+            // 渲染场景
+            renderer.render(scene, camera);
+        }
+        
+        // 加载模型
+        function loadModel(url) {
+            showLoading(true);
+            
+            // 清除现有模型
+            if (model) {
+                scene.remove(model);
+                model = null;
+            }
+            
+            // 创建GLTF加载器
+            const loader = new THREE.GLTFLoader();
+            
+            // 加载模型
+            loader.load(
+                url,
+                function (gltf) {
+                    model = gltf.scene;
+                    
+                    // 调整模型大小和位置
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    
+                    // 计算缩放比例，使模型适应视口
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 5 / maxDim;
+                    model.scale.set(scale, scale, scale);
+                    
+                    // 居中模型
+                    model.position.sub(center);
+                    
+                    // 添加到场景
+                    scene.add(model);
+                    
+                    // 重置相机和控制器
+                    camera.position.set(0, 0, 5);
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                    
+                    // 检查是否有动画
+                    if (gltf.animations && gltf.animations.length > 0) {
+                        mixer = new THREE.AnimationMixer(model);
+                        const action = mixer.clipAction(gltf.animations[0]);
+                        action.play();
+                        toggleAnimationBtn.disabled = false;
+                    } else {
+                        toggleAnimationBtn.disabled = true;
+                        animationActive = false;
+                        toggleAnimationBtn.innerHTML = '<i class="fa-solid fa-play mr-2"></i>动画';
+                    }
+                    
+                    // 更新模型信息
+                    updateModelInfo(model);
+                    
+                    showLoading(false);
+                },
+                function (xhr) {
+                    // 加载进度
+                    const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                    console.log(`加载中: ${percent}%`);
+                },
+                function (error) {
+                    console.error('加载模型时出错:', error);
+                    alert('加载模型失败，请检查网络连接或模型URL。');
+                    showLoading(false);
+                }
+            );
+        }
+        
+        // 显示/隐藏加载指示器
+        function showLoading(show) {
+            loadingIndicator.classList.toggle('hidden', !show);
+        }
+        
+        // 更新模型信息
+        function updateModelInfo(model) {
+            const geometryCount = countGeometries(model);
+            const materialCount = countMaterials(model);
+            const vertexCount = countVertices(model);
+            
+            const modelInfo = document.getElementById('modelInfo');
+            modelInfo.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-primary mb-1">${geometryCount}</div>
+                        <div class="text-sm text-gray-600">几何体</div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-primary mb-1">${materialCount}</div>
+                        <div class="text-sm text-gray-600">材质</div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-2xl font-bold text-primary mb-1">${formatNumber(vertexCount)}</div>
+                        <div class="text-sm text-gray-600">顶点数</div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h4 class="font-medium mb-2">模型操作</h4>
+                    <ul class="list-disc pl-5 space-y-1 text-gray-700">
+                        <li>拖动鼠标：旋转模型</li>
+                        <li>滚动鼠标滚轮：缩放模型</li>
+                        <li>Shift+拖动鼠标：平移模型</li>
+                    </ul>
+                </div>
+            `;
+        }
+        
+        // 计算几何体数量
+        function countGeometries(object) {
+            let count = 0;
+            object.traverse(function(child) {
+                if (child.isMesh) {
+                    count++;
+                }
+            });
+            return count;
+        }
+        
+        // 计算材质数量
+        function countMaterials(object) {
+            const materials = new Set();
+            object.traverse(function(child) {
+                if (child.isMesh && child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(material => materials.add(material));
+                    } else {
+                        materials.add(child.material);
+                    }
+                }
+            });
+            return materials.size;
+        }
+        
+        // 计算顶点数量
+        function countVertices(object) {
+            let count = 0;
+            object.traverse(function(child) {
+                if (child.isMesh && child.geometry && child.geometry.attributes.position) {
+                    count += child.geometry.attributes.position.count;
+                }
+            });
+            return count;
+        }
+        
+        // 格式化数字
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // 初始化事件监听
+        function initEventListeners() {
+            // 重置视图按钮
+            resetViewBtn.addEventListener('click', function() {
+                if (model) {
+                    camera.position.set(0, 0, 5);
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                }
+            });
+            
+            // 切换动画按钮
+            toggleAnimationBtn.addEventListener('click', function() {
+                animationActive = !animationActive;
+                toggleAnimationBtn.innerHTML = animationActive 
+                    ? '<i class="fa-solid fa-pause mr-2"></i>动画' 
+                    : '<i class="fa-solid fa-play mr-2"></i>动画';
+            });
+            
+            // 缩放滑块
+            scaleSlider.addEventListener('input', function() {
+                if (model) {
+                    const scale = parseFloat(this.value);
+                    model.scale.set(scale, scale, scale);
+                }
+            });
+            
+            // 曝光度滑块
+            exposureSlider.addEventListener('input', function() {
+                const exposure = parseFloat(this.value);
+                renderer.toneMappingExposure = exposure;
+            });
+            
+            // 环境贴图选择
+            envMapSelect.addEventListener('change', function() {
+                const envMap = this.value;
+                // 实际应用中需要加载相应的环境贴图
+                console.log('环境贴图已更改:', envMap);
+            });
+            
+            // 背景颜色选择
+            document.querySelectorAll('[data-bg-color]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const color = this.getAttribute('data-bg-color');
+                    scene.background = new THREE.Color(color);
+                });
+            });
+        }
+        
+        // 初始化应用
+        window.addEventListener('DOMContentLoaded', function() {
+            init();
+            initEventListeners();
+        });
+    </script>
+</body>
+</html>
+    
